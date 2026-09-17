@@ -1,0 +1,4 @@
+# har tick battery padho aur bus par bhejo
+maano b = battery kitni hai
+bolo "battery" b
+dikhao "dhadkan: battery", b, "percent"

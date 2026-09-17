@@ -1,0 +1,6 @@
+# battery kam ho toh poora system band karo
+maano b = battery kitni hai
+agar b < 78 toh
+  dikhao "battery kam hai -- e-stop!"
+  band karo
+khatam

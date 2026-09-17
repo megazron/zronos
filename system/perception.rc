@@ -1,0 +1,3 @@
+# scene mein object dhundo aur bhejo
+maano d = object dhundo "cone"
+bolo "detection" d.label

@@ -1,0 +1,36 @@
+# ChalaoOS system manifest -- a patrol robot.
+# Har service ek Robot Chalao (.rc) program hai.
+
+[service bringup]
+script = bringup.rc
+rate_hz = 0
+restart = never
+autostart = true
+
+[service heartbeat]
+script = heartbeat.rc
+after = bringup
+rate_hz = 2
+restart = on-failure
+autostart = true
+
+[service perception]
+script = perception.rc
+after = bringup
+rate_hz = 1
+restart = always
+autostart = true
+
+[service drive]
+script = drive.rc
+after = heartbeat
+rate_hz = 1
+restart = always
+autostart = true
+
+[service watchdog]
+script = watchdog.rc
+after = heartbeat
+rate_hz = 2
+restart = always
+autostart = true
