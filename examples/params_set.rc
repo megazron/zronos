@@ -1,0 +1,4 @@
+# parameter server: ek service param set karti hai
+param set "max_speed" 0.5
+param set "robot_name" "atlas"
+dikhao "params set kiye"

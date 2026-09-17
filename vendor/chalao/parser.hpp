@@ -14,7 +14,7 @@ class Parser {
     const std::set<std::string> ANGLE {"degree","degrees","rad","radian","radians"};
     const std::set<std::string> DIST  {"meter","meters","metre","cm","mm"};
     const std::set<std::string> QUERY {"kahan","joints","battery","TF","object","IK","FK",
-        "camera","lidar","depth","imu","dabav","obstacle","AprilTag","ArUco","param"};
+        "camera","lidar","depth","imu","dabav","obstacle","AprilTag","ArUco","param","sewa"};
 public:
     explicit Parser(std::vector<Token> t) : toks(std::move(t)) {}
 
@@ -259,9 +259,26 @@ private:
         if (w == "AprilTag") { eat(); eatKw("dhundo"); return RC("find_apriltag", ln); }
         if (w == "ArUco") { eat(); eatKw("dhundo"); return RC("find_aruco", ln); }
         if (w == "TF") { eat(); eatKw("pucho"); auto frm = S(eatString(),ln); eatKw("se"); auto to = S(eatString(),ln); auto n = RC("tf", ln); arg(n,"from_frame",frm); arg(n,"to_frame",to); return n; }
+        // transforms (TF tree): frame "child" "parent" (x,y,z,roll,pitch,yaw)
+        if (w == "frame") {
+            eat(); auto child = S(eatString(),ln); auto parent = S(eatString(),ln); auto v = tuple(6);
+            auto n = RC("tf_set", ln); arg(n,"child",child); arg(n,"parent",parent);
+            arg(n,"x",v[0]); arg(n,"y",v[1]); arg(n,"z",v[2]); arg(n,"roll",v[3]); arg(n,"pitch",v[4]); arg(n,"yaw",v[5]);
+            return n;
+        }
+        // health / diagnostics: sehat theek | sehat warning "msg" | sehat kharaab "msg"
+        if (w == "sehat") {
+            eat(); std::string lvl = eatIdent(); auto n = RC("diag", ln); arg(n,"level",S(lvl,ln));
+            if (cur().type == TT::String) arg(n,"msg",S(eatString(),ln)); else arg(n,"msg",S("",ln));
+            return n;
+        }
         // raw
         if (w == "bolo") { eat(); auto topic = S(eatString(),ln); auto n = RC("publish", ln); arg(n,"topic",topic); arg(n,"value",expression()); return n; }
-        if (w == "sewa") { eat(); eatKw("bulao"); auto name = S(eatString(),ln); NodePtr args; if (cur().type==TT::Newline||cur().type==TT::Eof){ args=mk(NT::DictLit,ln);} else args=expression(); auto n = RC("call_service", ln); arg(n,"name",name); arg(n,"args",args); return n; }
+        if (w == "sewa") {
+            eat();
+            if (isKw("do")) { eat(); auto name = S(eatString(),ln); auto n = RC("service_advertise", ln); arg(n,"name",name); arg(n,"fn",S(eatIdent(),ln)); return n; }
+            eatKw("bulao"); auto name = S(eatString(),ln); NodePtr args; if (cur().type==TT::Newline||cur().type==TT::Eof){ args=mk(NT::DictLit,ln);} else args=expression(); auto n = RC("call_service", ln); arg(n,"name",name); arg(n,"args",args); return n;
+        }
         if (w == "nodes") { eat(); eatKw("dikhao"); return RC("list_nodes", ln); }
         if (w == "topics") { eat(); eatKw("dikhao"); return RC("list_topics", ln); }
         if (w == "record") { eat(); if (isKw("shuru")) { eat(); auto n = RC("record_start", ln); arg(n,"bag",S(eatString(),ln)); return n; } eatKw("band"); return RC("record_stop", ln); }

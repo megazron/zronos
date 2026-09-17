@@ -1,0 +1,6 @@
+# TF tree: frames register karo, phir ek lookup karo
+frame "base" "odom" (1, 0, 0, 0, 0, 0)
+frame "arm" "base" (0, 0, 0.5, 0, 0, 1.5708)
+maano p = TF pucho "arm" se "odom"
+dikhao "arm frame odom mein:", p
+bolo "arm_pose" p

@@ -83,6 +83,14 @@ private:
             else if (ch == '.' && !dot && std::isdigit((unsigned char)peek(1))) { dot = true; buf += advance(); }
             else break;
         }
+        // scientific notation: e/E [ + | - ] digits  (e.g. 2.25e-05, 1E6)
+        if ((peek() == 'e' || peek() == 'E') &&
+            (std::isdigit((unsigned char)peek(1)) ||
+             ((peek(1) == '+' || peek(1) == '-') && std::isdigit((unsigned char)peek(2))))) {
+            buf += advance();                       // e / E
+            if (peek() == '+' || peek() == '-') buf += advance();
+            while (std::isdigit((unsigned char)peek())) buf += advance();
+        }
         return {TT::Number, buf, l, c};
     }
     Token ident(int l, int c) {

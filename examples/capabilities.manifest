@@ -1,0 +1,38 @@
+# zronOS capabilities demo: parameter server, TF tree, inter-service RPC, health.
+[service params_set]
+script = params_set.rc
+restart = never
+rate_hz = 0
+autostart = true
+
+[service params_get]
+script = params_get.rc
+after = params_set
+restart = never
+rate_hz = 0
+autostart = true
+
+[service tf_demo]
+script = tf_demo.rc
+restart = never
+rate_hz = 0
+autostart = true
+
+[service rpc_provider]
+script = rpc_provider.rc
+restart = never
+rate_hz = 0
+autostart = true
+
+[service rpc_client]
+script = rpc_client.rc
+after = rpc_provider
+restart = never
+rate_hz = 0
+autostart = true
+
+[service health_demo]
+script = health_demo.rc
+rate_hz = 1
+restart = on-failure
+autostart = true

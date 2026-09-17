@@ -50,7 +50,14 @@ public:
     std::string baseDir;
     explicit Interpreter(bool sim = true) : simulate(sim) {}
     void run(const NodePtr& program) { execBlock(program->kids, globals); }
-    // --- ChalaoOS integration hooks (null by default -> standalone [nakli] behaviour) ---
+    // Cross-service RPC: invoke a top-level function by name with args.
+    // Returns false if no such function; used by zronOS `sewa bulao`.
+    bool callFunction(const std::string& fn, std::vector<Value>& args, Value& out) {
+        if (funcs.find(fn) == funcs.end()) return false;
+        out = callUser(fn, args, 0);
+        return true;
+    }
+    // --- zronOS integration hooks (null by default -> standalone [nakli] behaviour) ---
     std::function<void(const std::string&)> outSink;   // capture all program output (dikhao / [nakli] / ruko)
     std::function<bool(const std::string&, std::map<std::string,Value>&, Value&)> robotHook;  // intercept robot commands
 
@@ -334,6 +341,11 @@ private:
         if (m=="takeoff")    { say("udaan bhari -- drone upar"); return Value::Nil(); }
         if (m=="land")       { say("utar raha hai (land)"); return Value::Nil(); }
         if (m=="set_height") { say("height " + fmtf("%.2f", N("h")) + " " + S("unit") + " pe ja raha hai"); return Value::Nil(); }
+
+        // zronOS runtime commands (standalone [nakli] fallbacks)
+        if (m=="tf_set")    { say("frame '"+S("child")+"' <- '"+S("parent")+"' set"); return Value::Nil(); }
+        if (m=="service_advertise"){ say("sewa di: '"+S("name")+"' -> "+S("fn")); return Value::Nil(); }
+        if (m=="diag")      { std::string lv=S("level"); std::string ms=S("msg"); say(std::string("sehat: ")+lv+(ms.empty()?"":(" -- "+ms))); return Value::Nil(); }
 
         throw RCError("anjaan hukum '" + m + "'", "unknown command", n->line);
     }

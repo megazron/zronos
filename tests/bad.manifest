@@ -1,0 +1,13 @@
+# intentionally broken manifest for `zron doctor` (preflight) test
+[service ghost]
+script = does_not_exist.rc
+rate_hz = 1
+autostart = true
+
+[service a]
+script = ../system/heartbeat.rc
+after = b
+
+[service b]
+script = ../system/heartbeat.rc
+after = a

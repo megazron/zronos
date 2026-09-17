@@ -1,0 +1,4 @@
+# doosri service wahi param padhti hai (shared param server)
+maano v = param get "max_speed"
+maano nm = param get "robot_name"
+dikhao "max_speed =", v, " robot =", nm

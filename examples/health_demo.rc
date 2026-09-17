@@ -1,0 +1,7 @@
+# health/diagnostics: service apni sehat report karti hai
+maano b = battery kitni hai
+agar b < 20 toh
+  sehat kharaab "battery critical"
+warna
+  sehat theek
+khatam

@@ -1,0 +1,6 @@
+# RPC provider: ek kaam ko service ke roop mein advertise karta hai
+kaam speed_plan(target)
+  wapas target * 100
+khatam
+sewa do "plan_speed" speed_plan
+dikhao "plan_speed service ready"

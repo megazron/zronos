@@ -1,0 +1,3 @@
+# RPC client: doosri service ka function call karta hai aur result leta hai
+maano r = sewa bulao "plan_speed" 0.4
+dikhao "plan_speed(0.4) ne diya:", r.result

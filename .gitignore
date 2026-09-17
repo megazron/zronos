@@ -1,3 +1,8 @@
+zron
 chalaoos
 *.o
-*.out
+*.dSYM/
+__pycache__/
+*.pyc
+/mujoco_menagerie/
+*.bag
