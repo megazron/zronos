@@ -2,7 +2,7 @@
 <rect width="880" height="386" fill="#0d1117"/>
 <text x="30" y="42" font-size="21" font-weight="700" fill="#e6edf3">zronOS × MuJoCo compatibility</text>
 <text x="850" y="42" font-size="21" font-weight="800" fill="#3fb950" text-anchor="end">68 / 68 models</text>
-<text x="30" y="64" font-size="12.5" fill="#8b949e">Every open-source MuJoCo Menagerie robot: loaded in real physics, driven by an auto-generated Robot Chalao service under zron, stepped 200x.</text>
+<text x="30" y="64" font-size="12.5" fill="#8b949e">Every open-source MuJoCo Menagerie robot: loaded in real physics, driven under the zron binary, stepped 200x.</text>
 <text x="30" y="107" font-size="13" fill="#e6edf3">arm</text>
 <rect x="200" y="92" width="620" height="20" rx="4" fill="#0d1117" stroke="#30363d"/>
 <rect x="200" y="92" width="620" height="20" rx="4" fill="#3fb950"/>

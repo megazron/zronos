@@ -19,6 +19,16 @@ zronOS ships a MuJoCo bridge and a compatibility harness. For **every** robot in
 
 <p align="center"><b>68 / 68</b> open-source Menagerie models — arms, quadrupeds, humanoids, hands, drones and mobile bases — boot and run under zronOS. See the full <a href="docs/compat.md">compatibility matrix</a>.</p>
 
+<p align="center"><img src="docs/img/driven.gif" width="100%" alt="zronOS driving six real robots in MuJoCo physics: kuka iiwa, franka panda, ufactory xarm7, shadow hand, wonik allegro, leap hand"></p>
+
+<p align="center"><i>Real MuJoCo physics, driven live by the <code>zron</code> binary. Each robot's actuators follow the setpoints zron commands through the bridge — every joint you see move is a command from the runtime.</i></p>
+
+### Every robot zronOS was tested on
+
+<p align="center"><img src="docs/img/gallery.png" width="100%" alt="All 68 open-source MuJoCo Menagerie robots rendered in physics: arms, quadrupeds, humanoids, dexterous hands, drones, grippers and mobile manipulators"></p>
+
+<p align="center"><i>All 68 models, each loaded in real MuJoCo physics. Every one boots and runs under zronOS.</i></p>
+
 ```bash
 # reproduce it yourself (needs Python + `pip install mujoco`)
 git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie
