@@ -94,16 +94,12 @@ private:
         }
         return {TT::Number, buf, l, c};
     }
-    // Gen-Z slang -> canonical keyword (aliases; Hinglish still works). Kept
-    // identical to the robot-chalao core so .rc services can be written casually.
-    static const std::string& canonGenZ(const std::string& w) {
+    // Short aliases -> canonical keyword (aliases; full Hinglish still works).
+    // Kept identical to the robot-chalao core so .rc services can be typed short.
+    static const std::string& canonShort(const std::string& w) {
         static const std::unordered_map<std::string, std::string> m = {
-            {"linkup","jodo"}, {"dip","chhodo"}, {"slide","jao"}, {"crib","ghar"},
-            {"grab","pakdo"}, {"pace","speed"}, {"flex","dikhao"}, {"bet","maano"},
-            {"lowkey","agar"}, {"naur","warna"}, {"every","har"}, {"combo","kaam"},
-            {"tryna","koshish"}, {"mybad","galti"}, {"sendit","wapas"},
-            {"nocap","sach"}, {"cap","jhooth"}, {"chill","ruk"}, {"yap","bolo"},
-            {"peep","dekho"},
+            {"bas","khatam"}, {"bol","dikhao"}, {"rakh","maano"},
+            {"try","koshish"}, {"de","wapas"}, {"tod","ruko_loop"},
         };
         auto it = m.find(w);
         return it == m.end() ? w : it->second;
@@ -111,6 +107,6 @@ private:
     Token ident(int l, int c) {
         std::string buf;
         while (i < src.size()) { char ch = peek(); if (std::isalnum((unsigned char)ch) || ch == '_') buf += advance(); else break; }
-        return {TT::Ident, canonGenZ(buf), l, c};
+        return {TT::Ident, canonShort(buf), l, c};
     }
 };
