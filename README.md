@@ -2,6 +2,13 @@
 
 **A robot operating environment whose services are written in [Robot Chalao](https://github.com/megazron/robot-chalao) — the Hinglish robot language.** One manifest boots your whole robot: init, a service supervisor, a scheduler, a hardware abstraction layer, an IPC bus, an e-stop, and a shell. Built on the Robot Chalao native C++ core.
 
+
+<p align="center"><img src="docs/img/boot.gif" width="100%" alt="ChalaoOS boot demo: services start in dependency order, publish over the bus, and a watchdog trips the e-stop"></p>
+
+<p align="center"><i>One command boots the robot: <code>chalaoos --demo</code>. Services start in order, publish over the bus, and the watchdog trips the e-stop on low battery.</i></p>
+
+![ChalaoOS architecture](docs/img/architecture.svg)
+
 ```bash
 make
 ./chalaoos --demo --seconds 8

@@ -88,7 +88,7 @@ private:
             else if (kw == "action") { node = actionStmt();    expectNL(); return node; }
             else if (kw == "dikhao") node = printStmt();
             else if (kw == "wapas")  node = returnStmt();
-            else if (kw == "import") { eat(); if (cur().type == TT::String) eat(); node = mk(NT::ExprStmt, t.line); node->a = mk(NT::Num, t.line); node->a->num = 0.0; }
+            else if (kw == "import") { eat(); node = mk(NT::Import, t.line); node->s = eatString(); }
             else if (kw == "ruko_loop") { eat(); node = mk(NT::Break, t.line); }
             else {
                 node = robotCommand();

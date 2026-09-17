@@ -22,7 +22,7 @@ struct RCError : std::runtime_error {
 
 enum class NT {
     Program, Let, Print, Return, ExprStmt, If, While, ForEach, FuncDef, Try,
-    Break, Timer, Subscribe, ActionSend,
+    Break, Timer, Subscribe, ActionSend, Import,
     Num, Str, Bool, Ident, ListLit, DictLit, Call, Member, BinOp, UnaryOp,
     TypedCtor, RobotCommand
 };

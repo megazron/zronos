@@ -114,6 +114,7 @@ public:
     // ---- wire a fresh interpreter for a service (output sink + robot hook) ----
     void wire(Service* s){
         s->interp = std::make_unique<Interpreter>(true);
+        { auto sl = s->script.find_last_of('/'); s->interp->baseDir = (sl==std::string::npos)? std::string(".") : s->script.substr(0,sl); }
         std::string nm = s->name;
         s->interp->outSink = [this,s](const std::string& out){
             s->log.push_back(out); if(s->log.size()>40) s->log.pop_front();
