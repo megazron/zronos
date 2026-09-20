@@ -1,12 +1,12 @@
-// zronOS <-> MuJoCo hardware-in-the-loop HAL.
+// zronOS <-> MuJoCo simulation bridge client.
 //
-// This is the backend that lets the zron runtime drive a REAL physics robot.
-// It launches the Python MuJoCo bridge (zron_mj_bridge.py) as a child process,
+// This backend drives a robot model in MuJoCo physics.
+// It launches the Python MuJoCo bridge (zron_mujoco.py) as a child process,
 // talks to it over a line-oriented JSON protocol on two pipes, enumerates the
 // robot's actuators, then runs a closed control loop: every cycle zronOS
 // computes a command for each actuator, sends it to physics, reads the state
-// back, and its safety governor cuts the actuators (e-stop) the moment the
-// simulation shows instability. `zron mujoco <model.xml>` prints a one-line
+// back, and terminates the bridge run if state validation or the velocity
+// threshold fails. `zron mujoco <model.xml>` prints a one-line
 // JSON verdict used by the compatibility harness.
 //
 // No external C++ dependencies: raw fork/exec/pipe + a tiny hand JSON reader
@@ -22,6 +22,9 @@
 #include <sys/wait.h>
 #include <sstream>
 #include <iostream>
+#include <limits>
+#include <cctype>
+#include <csignal>
 
 namespace zmj {
 
@@ -37,7 +40,24 @@ static double jnum(const std::string& s, const char* key, double defv=0){
     std::string k=std::string("\"")+key+"\"";
     auto p=s.find(k); if(p==std::string::npos) return defv;
     p=s.find(':',p); if(p==std::string::npos) return defv;
-    return std::atof(s.c_str()+p+1);
+    const char* start=s.c_str()+p+1;
+    char* end=nullptr;
+    double value=std::strtod(start,&end);
+    if(end==start || !std::isfinite(value)) return defv;
+    while(*end && std::isspace(static_cast<unsigned char>(*end))) ++end;
+    if(*end!=',' && *end!='}') return defv;
+    return value;
+}
+
+static std::string jsonString(const std::string& value){
+    std::string out="\"";
+    const char* hex="0123456789abcdef";
+    for(unsigned char c:value){
+        if(c=='"' || c=='\\'){ out+='\\'; out+=c; }
+        else if(c<32){ out+="\\u00"; out+=hex[c>>4]; out+=hex[c&15]; }
+        else out+=c;
+    }
+    return out+'"';
 }
 
 // A live connection to a MuJoCo model, driven by zronOS.
@@ -53,8 +73,9 @@ struct Bridge {
         if(pid==0){                           // child: exec the python bridge
             dup2(a[0],0); dup2(b[1],1);
             close(a[0]);close(a[1]);close(b[0]);close(b[1]);
-            std::string full=bridgeCmd+" "+model;
-            execl("/bin/sh","sh","-c",full.c_str(),(char*)nullptr);
+            // The model is an opaque positional argument, never shell code.
+            std::string full=bridgeCmd+" \"$1\"";
+            execl("/bin/sh","sh","-c",full.c_str(),"zron-bridge",model.c_str(),(char*)nullptr);
             _exit(127);
         }
         close(a[0]); close(b[1]);
@@ -87,8 +108,8 @@ struct Verdict {
          <<",\"stable\":"<<(stable?"true":"false")
          <<",\"nu\":"<<nu<<",\"nq\":"<<nq<<",\"cycles\":"<<cycles
          <<",\"qvel_max\":"<<qvel_max<<",\"t\":"<<t;
-        if(!model.empty()) o<<",\"model\":\""<<model<<"\"";
-        if(!err.empty())   o<<",\"err\":\""<<err<<"\"";
+        if(!model.empty()) o<<",\"model\":"<<jsonString(model);
+        if(!err.empty())   o<<",\"err\":"<<jsonString(err);
         o<<"}"; return o.str();
     }
 };
@@ -114,27 +135,40 @@ inline Verdict compat(const std::string& bridgeCmd, const std::string& model,
     br.send("{\"cmd\":\"info\"}");
     if(!br.recv()){ v.err="no info reply"; br.stop(); return v; }
     std::string info=br.lastLine;
-    v.nu=(int)jnum(info,"nu"); v.nq=(int)jnum(info,"nq"); v.model=model.substr(model.find_last_of('/')+1);
-    bool estop=false;
+    const double invalid=std::numeric_limits<double>::quiet_NaN();
+    double nu=jnum(info,"nu",invalid), nq=jnum(info,"nq",invalid);
+    if(!jbool(info,"ok") || !std::isfinite(nu) || !std::isfinite(nq) ||
+       nu<0 || nq<0 || nu>100000 || nq>100000 || std::floor(nu)!=nu || std::floor(nq)!=nq){
+        v.err="invalid model info"; br.stop(); return v;
+    }
+    v.nu=(int)nu; v.nq=(int)nq;
+    v.model=model.substr(model.find_last_of('/')+1);
     for(int c=0; c<cycles; ++c){
-        // zronOS control law: gentle multi-phase sinusoid per actuator, held at
-        // zero once the safety governor trips.
+        // Open-loop multi-phase sinusoid per actuator, bounded in amplitude.
+        // A governor trip terminates the bridge run.
         std::ostringstream cmd; cmd<<"{\"cmd\":\"step\",\"n\":"<<substeps<<",\"ctrl\":[";
         for(int j=0;j<v.nu;++j){
-            double u = estop? 0.0 : amp*std::sin(0.03*c + 0.6*j);
+            double u = amp*std::sin(0.03*c + 0.6*j);
             cmd<<(j?",":"")<<u;
         }
         cmd<<"]}";
         br.send(cmd.str());
         if(!br.recv()){ v.err="bridge died mid-run"; break; }
         std::string rep=br.lastLine;
-        double qv=jnum(rep,"qvel_max"); bool st=jbool(rep,"stable",true);
-        v.qvel_max=qv; v.t=jnum(rep,"time"); v.cycles=c+1;
-        // safety governor: physics diverging -> assert e-stop (zronOS's job)
-        if(!st || qv>1e3){ estop=true; if(!st){ v.err="physics diverged"; break; } }
+        double qv=jnum(rep,"qvel_max",invalid), t=jnum(rep,"time",invalid);
+        if(!jbool(rep,"ok") || !jbool(rep,"finite") || !jbool(rep,"stable") ||
+           !std::isfinite(qv) || qv<0 || !std::isfinite(t) || t<=v.t){
+            v.err="bridge step rejected or invalid physics state"; break;
+        }
+        v.qvel_max=qv; v.t=t; v.cycles=c+1;
+        // Reject excessive velocity and terminate this simulation run.
+        if(qv>1e3){
+            v.err="velocity limit exceeded";
+            break;
+        }
     }
-    v.stable = v.err.empty();
-    v.ok = (v.cycles>0 && v.nu>=0);
+    v.ok = v.err.empty() && v.cycles==cycles && cycles>0;
+    v.stable = v.ok;
     br.stop();
     return v;
 }
@@ -149,6 +183,8 @@ inline int mujocoCompat(const std::vector<std::string>& a){
         if(a[i]=="--bridge" && i+1<a.size()) bridgeCmd=a[++i];
         else if(a[i]=="--cycles" && i+1<a.size()) cycles=std::atoi(a[++i].c_str());
     }
+    // Report a broken bridge as a failed run, not process death via SIGPIPE.
+    std::signal(SIGPIPE, SIG_IGN);
     Verdict v=zmj::compat(bridgeCmd, model, cycles);
     std::cout<<v.json()<<"\n";
     return (v.ok && v.stable)?0:1;
