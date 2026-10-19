@@ -1,0 +1,6 @@
+# a 10 Hz service: the scheduler must tick fast enough to run it 10x/s
+[service fast]
+script    = fast.rc
+rate_hz   = 10
+restart   = never
+autostart = true

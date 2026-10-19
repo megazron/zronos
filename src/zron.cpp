@@ -8,7 +8,10 @@
 // It is NOT a bare-metal kernel; it operates at the runtime layer (like "ROS"),
 // on top of Linux. One binary, zero dependencies, deterministic.
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -20,6 +23,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 #include "value.hpp"
 #include "ast.hpp"
@@ -28,7 +32,11 @@
 #include "interp.hpp"
 #include "mujoco_hal.hpp"
 
-static const char* OS_VERSION = "1.0.0";
+static const char* OS_VERSION = "1.1.0";
+
+// set by SIGINT/SIGTERM; `zron up` halts cleanly when it flips
+static std::atomic<bool> g_stop{false};
+static void onSignal(int){ g_stop = true; }
 
 static std::string ts(double t){ char b[32]; std::snprintf(b,sizeof b,"%6.2fs", t); return b; }
 static std::string f2(double d){ char b[32]; std::snprintf(b,sizeof b,"%.1f", d); return b; }
@@ -173,7 +181,7 @@ struct Service {
 // ------------------------------------------------------------------ the OS
 class ZronOS {
     double clock = 0.0;
-    const double DT = 0.5;
+    double DT = 0.5;   // scheduler tick; shrinks at boot to fit the fastest service
     HAL hal;
     Bus bus;
     Params params;
@@ -324,6 +332,8 @@ public:
 
     // ---- dependency-ordered boot ----
     void boot(){
+        // tick at least as fast as the fastest periodic service (<= 200 Hz)
+        for(auto& s:svcs) if(s->rate_hz>0) DT=std::min(DT, std::max(0.005, 1.0/s->rate_hz));
         const int W=52;
         auto boxline=[&](const std::string& in){ std::string t=in; if((int)t.size()>W-2) t=t.substr(0,W-2);
             std::cout << "  |" << t; for(int i=(int)t.size(); i<W-2; ++i) std::cout << ' '; std::cout << "|\n"; };
@@ -460,6 +470,33 @@ public:
         return 0;
     }
 
+    // ---- real time, headless (for systemd / a terminal) ----
+    // Ticks the scheduler on the wall clock until SIGINT/SIGTERM or `seconds`.
+    int up(double seconds){
+        std::setvbuf(stdout, nullptr, _IOLBF, 0);   // line-buffered logs under journald
+        std::signal(SIGINT, onSignal);
+        std::signal(SIGTERM, onSignal);
+        boot();
+        using C = std::chrono::steady_clock;
+        auto t0 = C::now(), next = t0;
+        auto step = std::chrono::duration_cast<C::duration>(std::chrono::duration<double>(DT));
+        while(!g_stop){
+            if(seconds>0 && clock+1e-9 >= seconds) break;
+            next += step;
+            std::this_thread::sleep_until(next);
+            if(g_stop) break;
+            tick();
+            if(C::now()-next > 10*step){   // overran badly: resync instead of bursting
+                kmsg("kernel","WARNING: scheduler fell behind real time; resyncing");
+                next = C::now();
+            }
+        }
+        if(g_stop) kmsg("init","signal received");
+        health();
+        halt();
+        return 0;
+    }
+
     // ---- interactive shell ----
     int shell(){
         boot();
@@ -472,7 +509,7 @@ public:
                 "    ps | health | topics | params | tf | echo TOPIC\n"
                 "    start N | stop N | restart N | log N\n"
                 "    tick [n] | uptime | fault NAME | clear | estop\n"
-                "    replay | halt | help\n"; }
+                "    replay | halt (quit) | help\n"; }
             else if(cmd=="ps") ps();
             else if(cmd=="health"||cmd=="doctor") health();
             else if(cmd=="topics") topics();
@@ -484,7 +521,7 @@ public:
             else if(cmd=="clear"){ hal.fault.clear(); std::cout<<"  faults cleared\n"; }
             else if(cmd=="estop"){ hal.estop(); std::cout<<"  e-stop asserted.\n"; }
             else if(cmd=="replay") replay(arg);
-            else if(cmd=="halt"){ halt(); break; }
+            else if(cmd=="halt"||cmd=="quit"||cmd=="exit"||cmd=="bye"){ halt(); return 0; }
             else if(cmd=="start"){ Service* s=find(arg); if(s) start(s); else std::cout<<"  no such service\n"; }
             else if(cmd=="stop"){ Service* s=find(arg); if(s){ s->state=St::STOPPED; std::cout<<"  stopped\n";} else std::cout<<"  no such service\n"; }
             else if(cmd=="restart"){ Service* s=find(arg); if(s){ wire(s); s->state=St::RUNNING; s->health=Hz::OK; s->healthMsg.clear(); s->restarts++; s->nextRun=clock; std::cout<<"  restarted\n";} else std::cout<<"  no such service\n"; }
@@ -494,6 +531,8 @@ public:
             else std::cout << "  anjaan hukum: "<<cmd<<" (try 'help')\n";
             std::cout << "zron> " << std::flush;
         }
+        std::cout << "\n";
+        halt();   // Ctrl-D / end of input
         return 0;
     }
 };
@@ -578,14 +617,15 @@ static int usage(){
     std::cout <<
       "zronOS " << OS_VERSION << " -- robot operating environment (services are Robot Chalao .rc)\n\n"
       "usage:\n"
-      "  zron run <manifest>        boot a manifest and drop into the shell\n"
+      "  zron up <manifest>         boot and run in real time, headless (Ctrl-C / SIGTERM halts)\n"
+      "  zron run <manifest>        boot a manifest and drop into the interactive shell\n"
       "  zron demo [manifest]       boot and run a deterministic story, then exit\n"
       "  zron doctor <manifest>     preflight checks (no boot): parse, deps, cycles\n"
       "  zron new <name>            scaffold a new robot (manifest + services)\n"
       "  zron mujoco <model.xml>    drive a MuJoCo model live via the bridge (HITL)\n"
       "  zron --version             print version\n"
       "  zron --help                this help\n\n"
-      "flags:  --seconds N (with demo)\n";
+      "flags:  --seconds N (demo: simulated story length; up: stop after N s)\n";
     return 0;
 }
 
@@ -601,10 +641,20 @@ int main(int argc, char** argv){
     if(sub=="mujoco"){ return zmj::mujocoCompat(a); }
 
     // demo / run (+ back-compat: bare manifest path or --demo flag)
-    bool demoMode=false; double seconds=8.0; std::string manifest="system/system.manifest";
+    // default robot: ./system/ in a checkout, else the installed copy
+    std::string manifest="system/system.manifest";
+    if(!std::ifstream(manifest)){
+        std::string inst=zmj::exeDir()+"/../share/zronos/system/system.manifest";
+        if(std::ifstream(inst)) manifest=inst;
+    }
+    bool demoMode=false, upMode=false; double seconds=-1;
     size_t start=0;
     if(sub=="demo"){ demoMode=true; start=1; }
+    else if(sub=="up"){ upMode=true; start=1; }
     else if(sub=="run"){ demoMode=false; start=1; }
+    else if(!sub.empty() && sub[0]!='-' && !std::ifstream(sub)){
+        std::cerr << "Bhai, anjaan command: " << sub << "  (zron --help)\n"; return 2;
+    }
     for(size_t i=start;i<a.size();++i){
         if(a[i]=="--demo") demoMode=true;
         else if(a[i]=="--seconds"&&i+1<a.size()) seconds=std::atof(a[++i].c_str());
@@ -614,5 +664,6 @@ int main(int argc, char** argv){
     if(slash!=std::string::npos) baseDir=manifest.substr(0,slash);
     ZronOS os;
     if(!os.loadManifest(manifest, baseDir)) return 2;
-    return demoMode ? os.demo(seconds) : os.shell();
+    if(upMode) return os.up(seconds);
+    return demoMode ? os.demo(seconds>0 ? seconds : 8.0) : os.shell();
 }

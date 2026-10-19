@@ -347,7 +347,7 @@ private:
             }
             eat(); auto n=mk(NT::Ident,ln); n->s=w; return postfix(n);
         }
-        throw RCError("yeh samajh nahi aaya", "unexpected token '" + t.value + "'", ln);
+        throw RCError("yeh samajh nahi aaya", t.type == TT::Newline ? std::string("unexpected end of line") : "unexpected token '" + t.value + "'", ln);
     }
     NodePtr postfix(NodePtr n) {
         while (isOp(".")) { int ln=lineno(); eat(); auto m=mk(NT::Member,ln); m->a=n; m->s=eatIdent(); n=m; }

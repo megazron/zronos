@@ -75,9 +75,39 @@ else
   echo "  SKIP  set ZRON_MJ=\"python3 bridge/zron_mujoco.py\" and ZRON_MODEL=<scene.xml> to run"
 fi
 
+echo "== scheduler resolution follows the fastest service =="
+OUT="$(./zron demo --seconds 2 tests/fast.manifest 2>&1)"
+RUNS=$(echo "$OUT" | awk '$1=="fast" && $2=="RUNNING" {print $6}')
+if [ -n "$RUNS" ] && [ "$RUNS" -ge 19 ] && [ "$RUNS" -le 21 ]; then echo "  PASS  10 Hz service runs ~20 times in 2 s ($RUNS)"; else echo "  FAIL  10 Hz service ran $RUNS times in 2 s"; fail=1; fi
+
+echo "== zron up (real time, headless) =="
+T0=$(date +%s.%N)
+OUT="$(timeout 10 ./zron up system/system.manifest --seconds 2 2>&1)"; RC=$?
+T1=$(date +%s.%N)
+ck "boot complete -- entering scheduler" "up boots"
+ck "zronOS band. Alvida." "up halts after --seconds"
+if awk -v a="$T0" -v b="$T1" 'BEGIN{d=b-a; exit !(d>=1.8 && d<4)}'; then echo "  PASS  up runs on the wall clock (~2 s)"; else echo "  FAIL  up wall time"; fail=1; fi
+[ "$RC" -eq 0 ] && echo "  PASS  up exits 0" || { echo "  FAIL  up exit code $RC"; fail=1; }
+LOG="$(mktemp)"
+./zron up system/system.manifest > "$LOG" 2>&1 & PID=$!
+sleep 1.5; kill -TERM "$PID"; wait "$PID"; RC=$?
+OUT="$(cat "$LOG")"; rm -f "$LOG"
+ck "signal received" "SIGTERM is caught"
+ck "summary: HEALTHY\|summary: DEGRADED\|summary: UNHEALTHY" "SIGTERM prints a final health report"
+ck "zronOS band. Alvida." "SIGTERM halts cleanly"
+[ "$RC" -eq 0 ] && echo "  PASS  SIGTERM exit 0" || { echo "  FAIL  SIGTERM exit code $RC"; fail=1; }
+
+echo "== shell =="
+OUT="$(printf 'ps\nquit\n' | ./zron run system/system.manifest 2>&1)"
+ck "zronOS band. Alvida." "quit halts the shell"
+OUT="$(printf 'ps\n' | ./zron run system/system.manifest 2>&1)"
+ck "zronOS band. Alvida." "end of input halts the shell"
+OUT="$(./zron frobnicate 2>&1)"; RC=$?
+ck "anjaan command" "unknown subcommand is reported"
+
 echo "== version =="
 OUT="$(./zron --version 2>&1)"
-ck "zronOS 1.0.0" "version string"
+ck "zronOS 1.1.0" "version string"
 
 [ $fail -eq 0 ] && echo "ALL TESTS PASSED" || echo "SOME TESTS FAILED"
 exit $fail

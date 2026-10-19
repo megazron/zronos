@@ -94,8 +94,11 @@ private:
         }
         return {TT::Number, buf, l, c};
     }
-    // Short aliases -> canonical keyword (aliases; full Hinglish still works).
-    // Kept identical to the robot-chalao core so .rc services can be typed short.
+    // Short aliases -> canonical keyword. These are aliases: the whole language
+    // still works in full Hinglish, but the common keywords can be typed short
+    // (bas -> khatam, bol -> dikhao, rakh -> maano). Applied at the identifier
+    // level so every rule and multi-word phrase just works, and native + Python
+    // stay byte-identical.
     static const std::string& canonShort(const std::string& w) {
         static const std::unordered_map<std::string, std::string> m = {
             {"bas","khatam"}, {"bol","dikhao"}, {"rakh","maano"},
