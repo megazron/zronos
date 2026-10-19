@@ -6,6 +6,8 @@
 
 <p align="center"><i>One command boots the robot: <code>zron demo</code>. Services start in dependency order, publish over the bus, and the watchdog trips the e-stop on low battery.</i></p>
 
+**[▶ Try it in your browser](https://megazron.github.io/zronos/)**: the real `zron` binary compiled to WebAssembly. Edit the manifest and services, boot the robot, use the shell, inject faults. Nothing to install.
+
 ```bash
 make
 ./zron demo --seconds 8
@@ -14,8 +16,8 @@ make
 **Install** a release (static Linux x86_64, no dependencies):
 
 ```bash
-curl -L https://github.com/megazron/zronos/releases/download/v1.1.0/zronos-v1.1.0-linux-x86_64.tar.gz | tar xz
-sudo cp -r zronos-v1.1.0-linux-x86_64/{bin,share} /usr/local/
+curl -L https://github.com/megazron/zronos/releases/download/v1.1.1/zronos-v1.1.1-linux-x86_64.tar.gz | tar xz
+sudo cp -r zronos-v1.1.1-linux-x86_64/{bin,share} /usr/local/
 zron demo
 ```
 

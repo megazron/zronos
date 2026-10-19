@@ -1,4 +1,4 @@
-# ChalaoOS system manifest -- a patrol robot.
+# zronOS system manifest -- a patrol robot.
 # Har service ek Robot Chalao (.rc) program hai.
 
 [service bringup]

@@ -1,8 +1,8 @@
 zron
-chalaoos
 *.o
 *.dSYM/
 __pycache__/
 *.pyc
 /mujoco_menagerie/
 *.bag
+_site/

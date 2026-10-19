@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zronOS Playground</title>
+<meta name="description" content="Boot a robot in your browser: the real zronOS runtime compiled to WebAssembly. Edit the manifest and Robot Chalao services, then boot, inspect and break it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Share+Tech+Mono&family=Saira:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #030d05; --panel: #071a0b; --panel2: #0a2410; --line: #15401d;
+  --green: #3dfa46; --cyan: #7ffcd5; --hazard: #ffb300; --red: #ff5a5a;
+  --text: #d6f5d8; --dim: #7fa585;
+  --mono: "Share Tech Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--void); color: var(--text); font-family: "Saira", system-ui, sans-serif; }
+body::after { content: ""; position: fixed; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(61,250,70,.025) 0 1px, transparent 1px 3px); }
+a { color: var(--cyan); }
+header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+h1 { margin: 0; font-family: "Barlow Condensed", sans-serif; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 30px; color: var(--green); }
+h1 small { color: var(--dim); font-size: 15px; letter-spacing: .1em; margin-left: 10px; }
+.tag { color: var(--dim); margin: 4px 0 0; font-size: 14px; max-width: 780px; }
+nav a { font-family: var(--mono); font-size: 13px; margin-left: 16px; text-decoration: none; border-bottom: 1px dashed var(--cyan); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; padding: 16px 24px 24px; }
+.plate { background: var(--panel); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  display: flex; flex-direction: column; min-height: 0; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel2); }
+.label { font-family: "Barlow Condensed"; text-transform: uppercase; letter-spacing: .12em; color: var(--cyan); font-size: 14px; }
+.grow { margin-right: auto; }
+select, button, input { font-family: var(--mono); font-size: 13px; color: var(--text); background: var(--void); border: 1px solid var(--line); padding: 7px 10px; }
+button, select { cursor: pointer; }
+select { min-width: 0; max-width: 100%; }
+button:hover, select:hover { border-color: var(--green); }
+button.go { background: var(--green); color: var(--void); border-color: var(--green); font-weight: bold; letter-spacing: .08em; }
+button.go:disabled { background: var(--line); border-color: var(--line); color: var(--dim); cursor: wait; }
+.files { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px 0; }
+.files button { border-bottom: 2px solid transparent; font-size: 12px; padding: 5px 8px; }
+.files button[aria-selected="true"] { color: var(--green); border-bottom-color: var(--green); }
+textarea { width: 100%; flex: 1; min-height: 380px; resize: vertical; background: var(--void); color: var(--text); border: 0; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 14px; line-height: 1.5; padding: 12px 14px; outline: none; tab-size: 2; }
+textarea:focus { box-shadow: inset 0 0 0 1px var(--green); }
+.modes { display: flex; gap: 0; }
+.modes button { border-right-width: 0; }
+.modes button:last-child { border-right-width: 1px; }
+.modes button[aria-pressed="true"] { color: var(--void); background: var(--cyan); border-color: var(--cyan); }
+.opts { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; color: var(--dim); }
+.opts textarea { min-height: 76px; flex: 1 1 100%; border: 1px solid var(--line); font-size: 13px; }
+.opts input[type=range] { padding: 0; accent-color: var(--green); }
+pre.out { margin: 0; padding: 12px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; overflow: auto; flex: 1; min-height: 420px; max-height: 70vh; }
+.out .t { color: #3b6b43; } .out .src { color: var(--cyan); } .out .k { color: var(--green); }
+.out .warn { color: var(--hazard); } .out .bad { color: var(--red); } .out .ok { color: var(--green); } .out .prompt { color: var(--dim); }
+.status { font-family: var(--mono); font-size: 12px; color: var(--dim); padding: 6px 12px; border-top: 1px solid var(--line); }
+.status.ok { color: var(--green); } .status.bad { color: var(--red); }
+.more { padding: 0 24px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.more h2 { font-family: "Barlow Condensed"; text-transform: uppercase; letter-spacing: .12em; color: var(--green); font-size: 18px; margin: 0 0 8px; }
+.more p, .more li { color: var(--dim); font-size: 14px; }
+.more img { width: 100%; border: 1px solid var(--line); display: block; }
+.more code, footer code { font-family: var(--mono); color: var(--green); }
+footer { padding: 0 24px 24px; color: var(--dim); font-size: 13px; }
+@media (max-width: 900px) {
+  header, main, .more, footer { padding-left: 16px; padding-right: 16px; }
+  main, .more { grid-template-columns: minmax(0, 1fr); }
+  textarea, pre.out { min-height: 280px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>zronOS <small id="ver">playground</small></h1>
+    <p class="tag">A robot operating environment whose services are <a href="https://megazron.github.io/robot-chalao/">Robot Chalao</a> programs.
+      This is the real <code>zron</code> binary compiled to WebAssembly: edit the manifest and services, then boot it, poke the shell, inject faults.</p>
+  </div>
+  <nav>
+    <a href="https://github.com/megazron/zronos">GitHub</a>
+    <a href="https://github.com/megazron/zronos/releases/latest">Install</a>
+    <a href="https://github.com/megazron/zronos/blob/main/docs/compat.md">68 MuJoCo robots</a>
+  </nav>
+</header>
+
+<main>
+  <section class="plate">
+    <div class="bar">
+      <span class="label grow">Robot</span>
+      <select id="preset" aria-label="Robot preset"></select>
+      <button id="reset" title="Discard edits">Reset</button>
+    </div>
+    <div class="files" id="files" role="tablist"></div>
+    <textarea id="editor" spellcheck="false" aria-label="File contents"></textarea>
+  </section>
+
+  <section class="plate">
+    <div class="bar">
+      <div class="modes" id="modes">
+        <button data-mode="demo" aria-pressed="true">Boot demo</button>
+        <button data-mode="shell" aria-pressed="false">Shell</button>
+        <button data-mode="doctor" aria-pressed="false">Doctor</button>
+      </div>
+      <span class="grow"></span>
+      <button id="run" class="go" disabled>Loading…</button>
+    </div>
+    <div class="opts" id="opt-demo">
+      <label for="secs">simulated time</label>
+      <input type="range" id="secs" min="1" max="30" value="8">
+      <span id="secs-v">8 s</span>
+      <span>· boots in dependency order, runs the scheduler, then prints <code>ps</code>, topics and health</span>
+    </div>
+    <div class="opts" id="opt-shell" hidden>
+      <span>Shell commands, one per line (run after boot):
+        <code>tick n</code> · <code>ps</code> · <code>topics</code> · <code>echo TOPIC</code> · <code>params</code> · <code>tf</code> · <code>health</code> ·
+        <code>fault NAME</code> · <code>estop</code> · <code>stop/start/restart SVC</code> · <code>log SVC</code> · <code>replay</code></span>
+      <textarea id="shell">tick 10
+ps
+topics
+health
+quit</textarea>
+    </div>
+    <div class="opts" id="opt-doctor" hidden>
+      <span>Preflight without booting: every script parses, dependencies resolve, no cycles, sane rates.</span>
+    </div>
+    <pre class="out" id="out"><span class="prompt">Loading the zron WebAssembly binary…</span></pre>
+    <div class="status" id="status">booting…</div>
+  </section>
+</main>
+
+<section class="more">
+  <div>
+    <h2>Same binary, real physics</h2>
+    <img src="driven.gif" alt="zronOS driving six robot arms and hands in MuJoCo physics" loading="lazy">
+    <p>On your machine, <code>zron mujoco scene.xml</code> drives any MuJoCo model through the bridge. Physics needs Python and MuJoCo, so it isn't in the browser;
+      see the <a href="https://github.com/megazron/zronos/blob/main/docs/compat.md">68/68 compatibility matrix</a>.</p>
+  </div>
+  <div>
+    <h2>Run it for real</h2>
+    <ul>
+      <li>Install: download <code>zronos-v1.1.1-linux-x86_64.tar.gz</code> from <a href="https://github.com/megazron/zronos/releases/latest">Releases</a>, or <code>make &amp;&amp; sudo make install</code>.</li>
+      <li><code>zron new mybot</code> scaffolds a robot; <code>zron doctor</code> checks it.</li>
+      <li><code>zron up mybot/robot.manifest</code> runs it in real time; Ctrl-C or SIGTERM halts cleanly. A systemd unit is in <code>contrib/</code>.</li>
+      <li>Services are written in <a href="https://megazron.github.io/robot-chalao/">Robot Chalao</a>; try the language in its own playground.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>The browser build uses a virtual clock and the simulated HAL, exactly like <code>zron demo</code>. MIT · built by <a href="https://github.com/megazron">megazron</a>.</footer>
+
+<script src="zron.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

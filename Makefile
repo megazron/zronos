@@ -29,6 +29,6 @@ uninstall:
 	rm -rf $(DESTDIR)$(PREFIX)/share/zronos
 
 clean:
-	rm -f zron chalaoos *.o
+	rm -f zron *.o
 
 .PHONY: test static san install uninstall clean

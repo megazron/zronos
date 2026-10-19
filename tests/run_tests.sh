@@ -19,6 +19,7 @@ ck "detection      cone"    "blackboard: detection topic published"
 ck "E-STOP asserted by service 'watchdog'" "service trips the e-stop"
 ck "\[hal\] BLOCKED -- actuators are in e-stop" "HAL respects e-stop after trip"
 ck "zronOS band. Alvida." "clean halt"
+ck "summary: UNHEALTHY" "an e-stopped HAL makes the health summary UNHEALTHY"
 
 echo "== supervisor restart policy =="
 OUT="$(./zron demo --seconds 3 tests/restart.manifest 2>&1)"
@@ -107,7 +108,7 @@ ck "anjaan command" "unknown subcommand is reported"
 
 echo "== version =="
 OUT="$(./zron --version 2>&1)"
-ck "zronOS 1.1.0" "version string"
+ck "zronOS 1.1.1" "version string"
 
 [ $fail -eq 0 ] && echo "ALL TESTS PASSED" || echo "SOME TESTS FAILED"
 exit $fail

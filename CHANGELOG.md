@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1] - 2026-10-19
+
+### Added
+- Browser playground at https://megazron.github.io/zronos/: the real `zron` compiled to WebAssembly. Edit a robot, then boot it, use the shell or run doctor.
+
+### Fixed
+- The health summary said HEALTHY while the HAL was e-stopped or faulted; it now reports UNHEALTHY.
+
 ## [1.1.0] - 2026-10-19
 
 ### Added

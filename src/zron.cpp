@@ -32,7 +32,7 @@
 #include "interp.hpp"
 #include "mujoco_hal.hpp"
 
-static const char* OS_VERSION = "1.1.0";
+static const char* OS_VERSION = "1.1.1";
 
 // set by SIGINT/SIGTERM; `zron up` halts cleanly when it flips
 static std::atomic<bool> g_stop{false};
@@ -440,6 +440,7 @@ public:
         }
         std::cout << "    " << (hal.healthy()?"[ OK ]":"[FAIL]") << "  HAL  -- battery "<<f2(hal.battery)<<"%, e-stop="
                   << (hal.estopped?"HAAN":"nahi") << (hal.fault.empty()?"":(", fault '"+hal.fault+"'")) << "\n";
+        if(!hal.healthy()) bad++;   // an e-stopped or faulted HAL is not a healthy robot
         std::cout << "  summary: " << (bad? "UNHEALTHY" : warn? "DEGRADED" : "HEALTHY")
                   << " ("<<bad<<" failed, "<<warn<<" degraded)\n\n";
         return bad? 1 : 0;
