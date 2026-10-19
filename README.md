@@ -11,6 +11,18 @@ make
 ./zron demo --seconds 8
 ```
 
+**Install** a release (static Linux x86_64, no dependencies):
+
+```bash
+curl -L https://github.com/megazron/zronos/releases/download/v1.1.0/zronos-v1.1.0-linux-x86_64.tar.gz | tar xz
+sudo cp -r zronos-v1.1.0-linux-x86_64/{bin,share} /usr/local/
+zron demo
+```
+
+Or from source: `make && sudo make install`.
+
+**Run a robot for real**: `zron up robot.manifest` runs the scheduler in real time, headless; Ctrl-C or SIGTERM halts it cleanly. To start it at boot, use `contrib/zronos@.service` (`systemctl enable --now zronos@mybot`, with the manifest in `/etc/zronos/mybot/`).
+
 ## Recorded compatibility with 68 MuJoCo models
 
 zronOS ships a MuJoCo bridge and a compatibility harness. For each selected robot in the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) it loads the real model in physics, auto-generates a Robot Chalao service that drives that robot's actuators, boots it under the real `zron` binary, and steps the commanded setpoints through MuJoCo — checking the state stays finite.
@@ -207,12 +219,13 @@ Run `./zron run` (or `./zron` with no args prints help) for an interactive shell
 | `estop` | assert the e-stop |
 | `replay` | replay the recorded bus |
 | `uptime` | clock + battery |
-| `halt` | stop everything and exit |
+| `halt` / `quit` | stop everything and exit |
 
 ## CLI
 
 ```bash
-zron run <manifest>        boot a manifest and drop into the shell
+zron up <manifest>         boot and run in real time, headless (Ctrl-C / SIGTERM halts)
+zron run <manifest>        boot a manifest and drop into the interactive shell
 zron demo [manifest]       boot and run a deterministic story, then exit
 zron doctor <manifest>     preflight checks (no boot): parse, deps, cycles
 zron new <name>            scaffold a new robot (manifest + services)
@@ -233,11 +246,12 @@ Requires only a C++17 compiler. No ROS, no external libraries. The MuJoCo bridge
 
 ## Relationship to Robot Chalao
 
-zronOS embeds the **Robot Chalao native C++ core** (vendored in [`vendor/chalao/`](vendor/chalao/)). The language is the general-purpose way to program one robot; zronOS is the runtime that boots and supervises many Robot Chalao programs as one system. See the language at <https://github.com/megazron/robot-chalao>.
+zronOS embeds the **Robot Chalao native C++ core** (vendored in [`vendor/chalao/`](vendor/chalao/), pinned to the release in `vendor/chalao/VERSION`; `tools/sync-chalao.sh` updates it and CI checks for drift). The language is the general-purpose way to program one robot; zronOS is the runtime that boots and supervises many Robot Chalao programs as one system. See the language at <https://github.com/megazron/robot-chalao>.
 
 ## Roadmap
 
 - A live HAL backend that speaks to the MuJoCo bridge (or ROS 2 / serial) so the same manifest runs in physics and on hardware.
+- Release notes: [CHANGELOG.md](CHANGELOG.md).
 - Preemptive scheduling and per-service CPU/time budgets.
 - Persistent parameters and a `sun` (subscribe) delivery path from the bus into services.
 - A `journalctl`-style on-disk log store and a boot-time dependency-graph visualiser.

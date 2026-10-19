@@ -173,11 +173,31 @@ inline Verdict compat(const std::string& bridgeCmd, const std::string& model,
     return v;
 }
 
+// Default bridge command: $ZRON_BRIDGE, else zron_mujoco.py found next to the
+// binary (source tree: ./bridge/, installed: ../share/zronos/bridge/).
+// Directory holding the running zron binary ("." if unknown).
+inline std::string exeDir(){
+    char buf[4096]; ssize_t n=readlink("/proc/self/exe", buf, sizeof buf - 1);
+    if(n<=0) return ".";
+    buf[n]=0; std::string exe(buf); auto sl=exe.find_last_of('/');
+    return sl==std::string::npos ? "." : exe.substr(0,sl);
+}
+
+inline std::string defaultBridge(){
+    if(const char* env=std::getenv("ZRON_BRIDGE")) if(*env) return env;
+    std::string dir=exeDir();
+    for(const std::string& rel : {std::string("/bridge/zron_mujoco.py"), std::string("/../share/zronos/bridge/zron_mujoco.py")}){
+        std::string p=dir+rel;
+        if(access(p.c_str(), R_OK)==0) return "python3 '"+p+"'";
+    }
+    return "python3 bridge/zron_mujoco.py";
+}
+
 // Entry point for `zron mujoco <model.xml> [--bridge CMD] [--cycles N]`.
 inline int mujocoCompat(const std::vector<std::string>& a){
     if(a.size()<2){ std::cerr<<"usage: zron mujoco <model.xml> [--bridge \"py bridge.py\"] [--cycles N]\n"; return 2; }
     std::string model=a[1];
-    std::string bridgeCmd = "python3 bridge/zron_mujoco.py";
+    std::string bridgeCmd = defaultBridge();
     int cycles=200;
     for(size_t i=2;i<a.size();++i){
         if(a[i]=="--bridge" && i+1<a.size()) bridgeCmd=a[++i];

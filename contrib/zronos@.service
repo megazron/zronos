@@ -1,0 +1,19 @@
+# systemd unit: run a zronOS robot at boot.
+#   sudo cp contrib/zronos@.service /etc/systemd/system/
+#   sudo systemctl enable --now zronos@mybot
+# boots /etc/zronos/mybot/robot.manifest; logs: journalctl -u zronos@mybot -f
+[Unit]
+Description=zronOS robot %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStartPre=/usr/local/bin/zron doctor /etc/zronos/%i/robot.manifest
+ExecStart=/usr/local/bin/zron up /etc/zronos/%i/robot.manifest
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=2
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target

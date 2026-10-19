@@ -1,20 +1,37 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install g++
-        run: sudo apt-get update && sudo apt-get install -y g++ make
       - name: Build
         run: make
       - name: Test
         run: make test
+      - name: AddressSanitizer + UBSan
+        run: make san && bash tests/run_tests.sh
+      - name: Install layout
+        run: |
+          make clean && make
+          make install PREFIX=/tmp/zr
+          cd / && /tmp/zr/bin/zron doctor /tmp/zr/share/zronos/system/system.manifest
+          /tmp/zr/bin/zron demo --seconds 2 > /dev/null
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install tested MuJoCo bridge dependency
-        run: python -m pip install mujoco==3.13.0
+        run: python -m pip install -r bridge/requirements.txt
       - name: Bridge protocol and real physics regressions
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+  vendor-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: vendor/chalao matches its pinned Robot Chalao release
+        run: tools/sync-chalao.sh --check
