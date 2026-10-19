@@ -11,9 +11,9 @@ make
 ./zron demo --seconds 8
 ```
 
-## Validated on every open-source MuJoCo robot
+## Recorded compatibility with 68 MuJoCo models
 
-zronOS ships a MuJoCo bridge and a compatibility harness. For **every** robot in the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) it loads the real model in physics, auto-generates a Robot Chalao service that drives that robot's actuators, boots it under the real `zron` binary, and steps the commanded setpoints through MuJoCo — checking the state stays finite.
+zronOS ships a MuJoCo bridge and a compatibility harness. For each selected robot in the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) it loads the real model in physics, auto-generates a Robot Chalao service that drives that robot's actuators, boots it under the real `zron` binary, and steps the commanded setpoints through MuJoCo — checking the state stays finite.
 
 <p align="center"><img src="docs/img/compat.svg" width="100%" alt="zronOS x MuJoCo compatibility chart"></p>
 
@@ -165,6 +165,30 @@ zron mujoco path/to/scene.xml --bridge "python3 bridge/zron_mujoco.py"
 ```
 
 `bridge/compat.py` uses the bridge to validate zronOS against the whole Menagerie and writes [`docs/compat.md`](docs/compat.md).
+
+### Bridge request validation
+
+A `step` accepts an integer `n` from 1 to 10,000 and, when supplied, exactly
+`nu` finite numeric controls. Invalid requests return `ok: false` without changing
+controls or advancing physics. Omitting `ctrl` keeps the previous controls.
+Malformed requests do not terminate the bridge. Reset restores the loaded model's
+first keyframe (or default state), including when launched with a relative path.
+
+The compiled client fails a run on rejected replies, missing/non-finite state,
+non-advancing time, or its velocity threshold. Model filenames are passed as
+arguments rather than interpreted as shell text. These protocol checks and the
+recorded 68-model results are smoke tests, not proofs of balance, task performance
+or real-hardware safety. `finite` means finite simulation state; the bridge's
+legacy `stable` field has the same meaning. The client also checks its velocity
+threshold. A stalled bridge still requires an external process timeout.
+
+Run the protocol regressions and an actual compiled-client/MuJoCo fixture:
+
+```bash
+make
+python -m pip install mujoco==3.13.0
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
 
 ## Shell
 

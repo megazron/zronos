@@ -22,13 +22,10 @@ import mujoco
 
 
 def load(path):
-    # Load from inside the model's own directory so relative <include>/asset
-    # paths resolve for every Menagerie model (some nest includes).
+    # MuJoCo resolves includes/assets relative to the XML file; preserve the
+    # caller's working directory so repeated loads and relative paths work.
     path = os.path.abspath(path)
-    d = os.path.dirname(path)
-    if d:
-        os.chdir(d)
-    model = mujoco.MjModel.from_xml_path(os.path.basename(path))
+    model = mujoco.MjModel.from_xml_path(path)
     data = mujoco.MjData(model)
     # start from keyframe 0 if the model ships one (a valid standing/home pose)
     if model.nkey > 0:
@@ -65,19 +62,33 @@ def info(model):
 
 
 def step(model, data, ctrl, n):
-    if ctrl is not None and len(ctrl) == model.nu:
-        data.ctrl[:] = np.asarray(ctrl, dtype=float)
+    # Validate the entire request before mutating controls or advancing time.
+    if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= 10000:
+        raise ValueError("n must be an integer between 1 and 10000")
+    controls = None
+    if ctrl is not None:
+        if not isinstance(ctrl, list) or len(ctrl) != model.nu:
+            raise ValueError(f"ctrl must contain exactly {model.nu} numbers")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in ctrl):
+            raise ValueError("ctrl must contain finite numbers")
+        controls = np.asarray(ctrl, dtype=float)
+        if not np.isfinite(controls).all():
+            raise ValueError("ctrl must contain finite numbers")
+    if controls is not None:
+        data.ctrl[:] = controls
     for _ in range(n):
         mujoco.mj_step(model, data)
     q = np.asarray(data.qpos, dtype=float)
     qv = np.asarray(data.qvel, dtype=float)
     finite = bool(np.all(np.isfinite(q))) and bool(np.all(np.isfinite(qv)))
-    qvel_max = float(np.max(np.abs(qv))) if qv.size and finite else (0.0 if finite else float("inf"))
+    finite = finite and bool(np.isfinite(data.sensordata).all()) and bool(np.isfinite(data.time))
+    qvel_max = float(np.max(np.abs(qv))) if qv.size and finite else (0.0 if finite else None)
+    clean = lambda values: [float(v) if np.isfinite(v) else None for v in values]
     return {
-        "ok": True, "time": float(data.time), "finite": finite,
+        "ok": True, "time": float(data.time) if np.isfinite(data.time) else None, "finite": finite,
         "stable": finite, "qvel_max": qvel_max,
-        "qpos": q[: min(len(q), 32)].tolist(),
-        "sensordata": np.asarray(data.sensordata, dtype=float)[:16].tolist(),
+        "qpos": clean(q[: min(len(q), 32)]),
+        "sensordata": clean(np.asarray(data.sensordata, dtype=float)[:16]),
     }
 
 
@@ -85,8 +96,9 @@ def main():
     if len(sys.argv) < 2:
         print(json.dumps({"ok": False, "error": "usage: zron_mujoco.py <model.xml>"}))
         return 2
+    model_path = os.path.abspath(sys.argv[1])
     try:
-        model, data = load(sys.argv[1])
+        model, data = load(model_path)
     except Exception as e:
         print(json.dumps({"ok": False, "error": f"load failed: {e}"}), flush=True)
         return 1
@@ -99,16 +111,24 @@ def main():
             req = json.loads(line)
         except Exception as e:
             print(json.dumps({"ok": False, "error": f"bad json: {e}"}), flush=True); continue
+        if not isinstance(req, dict):
+            print(json.dumps({"ok": False, "error": "request must be a JSON object"}), flush=True)
+            continue
         cmd = req.get("cmd")
         if cmd == "quit":
             break
         elif cmd == "info":
             print(json.dumps(info(model)), flush=True)
         elif cmd == "reset":
-            model, data = load(sys.argv[1]); print(json.dumps({"ok": True}), flush=True)
+            if model.nkey > 0:
+                mujoco.mj_resetDataKeyframe(model, data, 0)
+            else:
+                mujoco.mj_resetData(model, data)
+            mujoco.mj_forward(model, data)
+            print(json.dumps({"ok": True}), flush=True)
         elif cmd == "step":
             try:
-                print(json.dumps(step(model, data, req.get("ctrl"), int(req.get("n", 1)))), flush=True)
+                print(json.dumps(step(model, data, req.get("ctrl"), req.get("n", 1))), flush=True)
             except Exception as e:
                 print(json.dumps({"ok": False, "error": f"step failed: {e}"}), flush=True)
         else:
